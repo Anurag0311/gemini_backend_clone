@@ -10,3 +10,6 @@ class SignUpSchema(BaseModel):
 
 class OTPSchema(BaseModel):
     mobile: str = Field(min_length=10, max_length=10)
+
+class VerifyOTPSchema(BaseModel):
+    otp : str = Field(min_length=6, max_length=6)

@@ -5,8 +5,8 @@ from sqlalchemy import select
 
 from DB.connection import get_db
 from DB.models import User
-from DB.schema import SignUpSchema, OTPSchema
-from auth.auth_utils import get_password_hash
+from DB.schema import SignUpSchema, OTPSchema, VerifyOTPSchema
+from auth.auth_utils import get_password_hash, create_access_token
 from response.format import response_format_success, response_format_error, response_format_success_fetching
 
 import traceback
@@ -61,9 +61,28 @@ async def send_otp(request: OTPSchema, redis_client: RedisDep, db: AsyncSession 
         
         otp = random.randint(100000, 999999)
 
-        await redis_client.set(f"otp:{otp}", f"{result.id}", ex=60000)
+        await redis_client.set(f"otp:{otp}", f"{result.id}", ex=120)
     
         return response_format_success_fetching(data={"OTP":f"{otp} (Valid for 120 seconds)"})
+    except Exception as e:
+        traceback.print_exc()
+        return response_format_error(data="Internal Server Error")
+    
+
+@router.post("/auth/verify-otp")
+async def verify_otp(request: VerifyOTPSchema, redis_client: RedisDep, db: AsyncSession = Depends(get_db)):
+    try:
+        id = await redis_client.get(f"otp:{request.otp}")
+        if not id:
+            return response_format_error(data="OTP not valid")
+        
+        data = {'user_id':id}
+        access_token = create_access_token(data = data)
+
+        response = {
+            "access_token": access_token
+        }
+        return response_format_success_fetching(data=response)
     except Exception as e:
         traceback.print_exc()
         return response_format_error(data="Internal Server Error")
