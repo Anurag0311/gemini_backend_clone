@@ -7,20 +7,15 @@ from DB.connection import get_db
 from DB.models import User
 from DB.schema import SignUpSchema, OTPSchema
 from auth.auth_utils import get_password_hash
-from response.format import response_format_success, response_format_error
+from response.format import response_format_success, response_format_error, response_format_success_fetching
 
 import traceback
 import random
 import os
-import redis.asyncio as redis
+
+from redis_client import RedisDep
 
 router = APIRouter()
-
-
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = int(os.getenv("REDIS_PORT", 6379))
-
-redis_client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
 
 
 @router.post("/auth/signup")
@@ -57,7 +52,7 @@ async def sign_up(request: SignUpSchema, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/auth/send-otp")
-async def send_otp(request: OTPSchema, db: AsyncSession = Depends(get_db)):
+async def send_otp(request: OTPSchema, redis_client: RedisDep, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(User).where(User.mobile == request.mobile))
         result = result.scalars().first()
@@ -68,7 +63,7 @@ async def send_otp(request: OTPSchema, db: AsyncSession = Depends(get_db)):
 
         await redis_client.set(f"otp:{otp}", f"{result.id}", ex=60000)
     
-        return response_format_success(data={"OTP":f"{otp} (Valid for 60 seconds)"})
+        return response_format_success_fetching(data={"OTP":f"{otp} (Valid for 120 seconds)"})
     except Exception as e:
         traceback.print_exc()
         return response_format_error(data="Internal Server Error")
