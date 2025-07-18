@@ -1,11 +1,18 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from DB.connection import get_db
 
 import jwt
 import os
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 SECRET_KEY = str(os.getenv("SECRET_KEY", 'secret_key'))
 ALGORITHM = str(os.getenv("ALGORITHM", "HS256"))
@@ -58,3 +65,41 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+)-> dict:
+    """Retrieve the current user based on the token."""
+
+    token = token.replace("Bearer ", "").strip()
+
+
+    payload = verify_token(token)
+    # if payload is None:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED,
+    #         detail="Token is invalid or expired",
+    #         headers={"WWW-Authenticate": "Bearer"},
+    #     )
+
+    return payload
+
+
+def verify_token(token: str):
+    """
+    Verify and decode a JWT token.
+
+    Args:
+        token (str): The JWT token to decode.
+
+    Returns:
+        Optional[dict]: The decoded payload if the token is valid, otherwise None.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
