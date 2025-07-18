@@ -1,5 +1,8 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from exceptions.handlers import validation_exception_handler
+
 import uvicorn
 
 from api import users
@@ -17,6 +20,10 @@ app.add_middleware(
 router = APIRouter()
 
 app.include_router(users.router, prefix="/api/v1/user")
+
+
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
 
 # app start from here
 if __name__ == "__main__":
