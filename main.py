@@ -5,7 +5,7 @@ from exceptions.handlers import validation_exception_handler
 
 import uvicorn
 
-from api import users
+from api import users, chatroom
 
 app = FastAPI()
 
@@ -20,6 +20,7 @@ app.add_middleware(
 router = APIRouter()
 
 app.include_router(users.router, prefix="/api/v1/user")
+app.include_router(chatroom.router, prefix="/api/v1/chatroom")
 
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)

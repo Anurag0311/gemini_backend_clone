@@ -1,8 +1,9 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-from fastapi import Depends
+from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.exceptions import HTTPException
 
 from DB.connection import get_db
 
@@ -76,12 +77,14 @@ def get_current_user(
 
 
     payload = verify_token(token)
-    # if payload is None:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Token is invalid or expired",
-    #         headers={"WWW-Authenticate": "Bearer"},
-    #     )
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token is invalid or expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    #TODO: VERIFICATION OF USER_ID
 
     return payload
 

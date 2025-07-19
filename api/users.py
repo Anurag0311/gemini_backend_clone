@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -92,6 +92,7 @@ async def verify_otp(request: VerifyOTPSchema, redis_client: RedisDep, db: Async
 @router.post("/auth/reset-password")
 async def reset_password(request:VerifyOTPPasswordSchema, redis_client: RedisDep, db: AsyncSession = Depends(get_db)):
     try:
+        #TODO: TEST THIS
         id = await redis_client.get(f"otp:{request.otp}")
         if not id:
             return response_format_error(data="OTP not valid")
@@ -116,6 +117,7 @@ async def reset_password(request:VerifyOTPPasswordSchema, redis_client: RedisDep
 @router.post("/auth/change-password")
 async def change_password(request: ChangePasswordSchema, current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
+        #TODO: TEST THIS
         user_id = current_user.get('user_id', None)
         if user_id == None:
             return response_format_error(data= "Cannot find user")
@@ -140,6 +142,7 @@ async def change_password(request: ChangePasswordSchema, current_user: Dict = De
 @router.get("/user/me")
 async def user_info(current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
+        #TODO: ADD NUMBER OF CONVERSATION
         user_id = current_user.get('user_id', None)
         if user_id == None:
             return response_format_error(data= "Cannot find user")
