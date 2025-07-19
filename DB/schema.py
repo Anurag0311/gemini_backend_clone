@@ -20,3 +20,6 @@ class VerifyOTPPasswordSchema(BaseModel):
 
 class ChangePasswordSchema(BaseModel):
     new_password: str = Field(None, example="securePassword123", min_length=6)
+
+class MessageSchema(BaseModel):
+    message: str

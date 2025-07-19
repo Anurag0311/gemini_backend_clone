@@ -24,6 +24,7 @@ app.include_router(chatroom.router, prefix="/api/v1/chatroom")
 
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+#TODO: ADD HTTPEXCEPTION HANDLER
 
 
 # app start from here
