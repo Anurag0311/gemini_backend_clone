@@ -15,7 +15,7 @@ def generate_batch_id(prefix: str = "batch") -> str:
 
 def get_gemini_response(prompt: str):
     try:
-        GEMINI_API_KEY = os.getenv("GEMINI-API-KEY", None)
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", None)
         headers = {
             "X-goog-api-key": f"{GEMINI_API_KEY}",
             "Content-Type": "application/json"
