@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
-from exceptions.handlers import validation_exception_handler
+from fastapi.exceptions import RequestValidationError, HTTPException
+from exceptions.handlers import validation_exception_handler, http_exception_handler
 
 import uvicorn
 
@@ -25,7 +25,7 @@ app.include_router(subscription.router, prefix="/api/v1/subscription")
 
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
-#TODO: ADD HTTPEXCEPTION HANDLER
+app.add_exception_handler(HTTPException, http_exception_handler)
 
 
 # app start from here

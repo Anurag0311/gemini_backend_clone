@@ -3,9 +3,12 @@ from datetime import datetime, timedelta
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi.exceptions import HTTPException
 
 from DB.connection import get_db
+from DB.models import User
+from response.format import response_format_error
 
 import jwt
 import os
@@ -68,7 +71,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     return encoded_jwt
 
 
-def get_current_user(
+async def get_current_user(
     token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
 )-> dict:
     """Retrieve the current user based on the token."""
@@ -84,7 +87,13 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    #TODO: VERIFICATION OF USER_ID
+    user = await db.execute(select(User).where(User.id == int(payload['user_id'])))
+    user = user.scalars().first()
+    if not user:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
+            )
 
     return payload
 

@@ -21,23 +21,18 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 @router.post("/subscribe/pro")
 async def subscribe_pro(current_user: dict = Depends(get_current_user)):
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="subscription",
-            line_items=[{
-                "price": "price_1RmqCdB7az44GKPvVkpNywn0",  # Replace with your actual Stripe Price ID
-                "quantity": 1,
-            }],
-            success_url="http://localhost:8000/stripe-success" + "?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="http://localhost:8000/stripe-cancel",
-            metadata={"user_id": current_user["user_id"]},
-        )
-        return {"checkout_url": session.url}
-    except Exception as e:
-        traceback.print_exc()
-        # raise HTTPException(status_code=500, detail=str(e))
-        return response_format_error(data="Error Occurred")
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="subscription",
+        line_items=[{
+            "price": "price_1RmqCdB7az44GKPvVkpNywn0",  # Replace with your actual Stripe Price ID
+            "quantity": 1,
+        }],
+        success_url="http://localhost:8000/stripe-success" + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url="http://localhost:8000/stripe-cancel",
+        metadata={"user_id": current_user["user_id"]},
+    )
+    return {"checkout_url": session.url}
     
 
 @router.post("/webhook/stripe")

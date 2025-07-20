@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from typing import Dict
@@ -22,44 +22,38 @@ router = APIRouter()
 
 
 @router.post("/chatroom")
-async def create_chatroom(current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    try:#TODO: remove redis cache for chatroom_id
-        user_id = current_user.get('user_id', None)
-        if user_id == None:
-            return response_format_error(data= "Cannot find user")
-        
-        user_id = int(user_id)
-        
-        user = await db.execute(select(User).where(User.id == int(user_id)))
-        user = user.scalars().first()
-        if not user:
-            return response_format_error(data = "User Not Found")
+async def create_chatroom(redis_client: RedisDep, current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
 
-        if user.subscription_type == 'basic':
-            stmt = (
-                select(func.count(ChatroomHistory.id))
-                .join(Chatroom, Chatroom.id == ChatroomHistory.chat_id)
-                .where(
-                    Chatroom.user_id == user_id,
-                    func.date(ChatroomHistory.created_at) == date.today()
-                )
+    user_id = current_user.get('user_id', None)
+    if user_id == None:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
             )
-            result = await db.execute(stmt)
-            count = result.scalar_one()
+    
+    user_id = int(user_id)
+    
+    user = await db.execute(select(User).where(User.id == int(user_id)))
+    user = user.scalars().first()
+    if not user:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
+            )
 
-            if count <= 4:
-                chatroom_id = generate_batch_id("chatroom")
-                db.add(Chatroom(
-                    user_id = user_id,
-                    chatroom_id = chatroom_id
-                ))
+    if user.subscription_type == 'basic':
+        stmt = (
+            select(func.count(ChatroomHistory.id))
+            .join(Chatroom, Chatroom.id == ChatroomHistory.chat_id)
+            .where(
+                Chatroom.user_id == user_id,
+                func.date(ChatroomHistory.created_at) == date.today()
+            )
+        )
+        result = await db.execute(stmt)
+        count = result.scalar_one()
 
-                await db.commit()
-                return response_format_success_fetching(data={"chatroom_id": chatroom_id})
-            else:
-                return response_format_error(data="Daily prompt limit reached")
-        else:
-            #TODO: CHECK SUBSCRIPTION EXPIRATION_DATE Logic
+        if count <= 4:
             chatroom_id = generate_batch_id("chatroom")
             db.add(Chatroom(
                 user_id = user_id,
@@ -67,119 +61,137 @@ async def create_chatroom(current_user: Dict = Depends(get_current_user), db: As
             ))
 
             await db.commit()
+            await redis_client.delete(f"chatroom-{user_id}")
             return response_format_success_fetching(data={"chatroom_id": chatroom_id})
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=response_format_error(data="Daily prompt limit reached")
+            ) 
+    else:
+        #TODO: CHECK SUBSCRIPTION EXPIRATION_DATE Logic
+        chatroom_id = generate_batch_id("chatroom")
+        db.add(Chatroom(
+            user_id = user_id,
+            chatroom_id = chatroom_id
+        ))
 
-    except Exception as e:
-        db.rollback()
-        traceback.print_exc()
-        return response_format_error(data="Internal Server Error")
+        await db.commit()
+        return response_format_success_fetching(data={"chatroom_id": chatroom_id})
     
 
 @router.get("/chatroom")
 async def get_chatrooms(redis_client: RedisDep, current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    try:
-        user_id = current_user.get('user_id', None)
-        if user_id == None:
-            return response_format_error(data= "Cannot find user")
-        
-        user_id = int(user_id)
+    user_id = current_user.get('user_id', None)
+    if user_id == None:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
+            )
+    
+    user_id = int(user_id)
 
-        response = await redis_client.get(f"chatroom-{user_id}")
-        if response:
-           response = json.loads(response)
-           return response_format_success_fetching(data=response)
-        
-        data = await db.execute(select(Chatroom.chatroom_id).where(Chatroom.user_id == user_id))
-        data = data.scalars().all()
+    response = await redis_client.get(f"chatroom-{user_id}")
+    if response:
+        response = json.loads(response)
+        return response_format_success_fetching(data=response)
+    
+    data = await db.execute(select(Chatroom.chatroom_id).where(Chatroom.user_id == user_id))
+    data = data.scalars().all()
 
-        dict_data = [{"chatroom_id": row} for row in data]
+    dict_data = [{"chatroom_id": row} for row in data]
 
-        await redis_client.setex(f"chatroom-{user_id}", 600, json.dumps(dict_data))
+    await redis_client.setex(f"chatroom-{user_id}", 600, json.dumps(dict_data))
 
-        return response_format_success_fetching(data=dict_data)
-        
-    except Exception as e:
-        traceback.print_exc()
-        return response_format_error(data="Internal Server Error")
+    return response_format_success_fetching(data=dict_data)
 
 
 @router.get("/chatroom/{chatroom_id}")
 async def get_chatrooms(chatroom_id : str,  current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    try:
-        user_id = current_user.get('user_id', None)
-        if user_id == None:
-            return response_format_error(data= "Cannot find user")
-        
-        user_id = int(user_id)
+    user_id = current_user.get('user_id', None)
+    if user_id == None:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
+            )
+    
+    user_id = int(user_id)
 
-        chatroom = await db.execute(select(Chatroom).where(Chatroom.chatroom_id == chatroom_id))
-        chatroom = chatroom.scalars().first()
-        if not chatroom:
-            return response_format_error(data="Chatroom not found")
-        
-        chats = await db.execute(select(ChatroomHistory).where(ChatroomHistory.chat_id == chatroom.id).order_by(desc(ChatroomHistory.created_at)))
-        chats = chats.scalars().all()
-        if not chats:
-            return response_format_success_fetching(data="No chats")
-        
-        response = [{"prompt": chat.request_message, "prompt_response": chat.response_message} for chat in chats]
-        return response_format_success_fetching(data=response)
-    except Exception as e:
-        traceback.print_exc()
-        return response_format_error(data="Internal Server Error")
+    chatroom = await db.execute(select(Chatroom).where(Chatroom.chatroom_id == chatroom_id))
+    chatroom = chatroom.scalars().first()
+    if not chatroom:
+        raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=response_format_error(data="chatroom not found")
+                )
+    
+    chats = await db.execute(select(ChatroomHistory).where(ChatroomHistory.chat_id == chatroom.id).order_by(desc(ChatroomHistory.created_at)))
+    chats = chats.scalars().all()
+    if not chats:
+        return response_format_success_fetching(data="No chats")
+    
+    response = [{"prompt": chat.request_message, "prompt_response": chat.response_message} for chat in chats]
+    return response_format_success_fetching(data=response)
     
 
 
 @router.post("/chatroom/{chatroom_id}")
 async def prompt(chatroom_id : str, request : MessageSchema, redis_client: RedisDep, current_user: Dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    try:
-        user_id = current_user.get('user_id', None)
-        if user_id == None:
-            return response_format_error(data= "Cannot find user")
-        
-        user_id = int(user_id)
-
-        user = await db.execute(select(User).where(User.id == int(user_id)))
-        user = user.scalars().first()
-        if not user:
-            return response_format_error(data = "User Not Found")
-        
-        chatroom = await db.execute(select(Chatroom).where(Chatroom.chatroom_id == chatroom_id))
-        chatroom = chatroom.scalars().first()
-        if not chatroom:
-            return response_format_error(data="Chatroom not found")
-        
-        if user.subscription_type == 'basic':
-            stmt = (
-                select(func.count(ChatroomHistory.id))
-                .join(Chatroom, Chatroom.id == ChatroomHistory.chat_id)
-                .where(
-                    Chatroom.user_id == user_id,
-                    func.date(ChatroomHistory.created_at) == date.today()
-                )
+    user_id = current_user.get('user_id', None)
+    if user_id == None:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
             )
-            result = await db.execute(stmt)
-            count = result.scalar_one()
+    
+    user_id = int(user_id)
 
-            if count >= 5:
-                return response_format_error(data="Daily Limit Reached")
+    user = await db.execute(select(User).where(User.id == int(user_id)))
+    user = user.scalars().first()
+    if not user:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="User not found")
+            )
+    
+    chatroom = await db.execute(select(Chatroom).where(Chatroom.chatroom_id == chatroom_id))
+    chatroom = chatroom.scalars().first()
+    if not chatroom:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response_format_error(data="Chatroom not found")
+            )
+    
+    if user.subscription_type == 'basic':
+        stmt = (
+            select(func.count(ChatroomHistory.id))
+            .join(Chatroom, Chatroom.id == ChatroomHistory.chat_id)
+            .where(
+                Chatroom.user_id == user_id,
+                func.date(ChatroomHistory.created_at) == date.today()
+            )
+        )
+        result = await db.execute(stmt)
+        count = result.scalar_one()
+
+        if count >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=response_format_error(data="Daily Limit Reached")
+            ) 
 
 
-        task = get_and_store.delay(request.message, chatroom.id)
+    task = get_and_store.delay(request.message, chatroom.id)
 
-        return response_format_success(data = {
-        "task_id": task.id,
-        "status": "processing"
-        })
-    except Exception as e:
-        traceback.print_exc()
-        return response_format_error(data="Internal Server Error")
+    return response_format_success(data = {
+    "task_id": task.id,
+    "status": "processing"
+    })
     
 
 @router.get("/chatroom/message-status/{task_id}")
 def check_message_status(task_id: str):
     result = AsyncResult(task_id, app=celery_app)
-    print(result)
     if result.state == "PENDING":
         return {"status": "pending"}
     elif result.state == "SUCCESS":
