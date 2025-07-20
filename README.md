@@ -230,6 +230,25 @@ Stripe is used to manage paid subscriptions:
 
 This allows your app to gate access to premium features (e.g., more Gemini requests or advanced chatroom options).
 
+✅ Stripe Test Card Numbers (Success & Failure)
+✅ Successful Payment
+    Use this card for a successful payment:
+        Card Number: 4242 4242 4242 4242
+        Exp Date: Any future date (e.g., 12/34)
+        CVC: Any 3 digits (e.g., 123)
+        ZIP: Any 5 digits (e.g., 12345)
+
+| Card Number           | Error Simulated  | Description                                |
+| --------------------- | ---------------- | ------------------------------------------ |
+| `4000 0000 0000 9995` | Card declined    | Generic card decline                       |
+| `4000 0000 0000 0002` | Card declined    | Card declined with insufficient funds      |
+| `4000 0000 0000 0069` | Expired card     | The card is expired                        |
+| `4000 0000 0000 0127` | Incorrect CVC    | CVC check fails                            |
+| `4000 0000 0000 0119` | Processing error | An error occurred while processing payment |
+| `4100 0000 0000 0019` | Fraudulent card  | Payment blocked due to suspected fraud     |
+
+
+
 
 ### 8. Assumptions / Design Decisions
 It is assumed that the user does not require an immediate Gemini API response in the same request to `POST /chatroom/{id}`.
