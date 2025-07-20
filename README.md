@@ -260,3 +260,186 @@ To keep the API responsive and scalable, the request to `/chatroom/{id}` simply 
 The client (frontend or Postman) can then poll `/chatroom/message-status/{task_id}` to check if the Gemini response is ready.
 
 This design ensures a non-blocking UX and allows background processing of long-running tasks.
+
+
+## How to Test Gemini Clone via Postman
+
+1. Sign Up
+Request Name: Sign up 
+
+Request Method: POST
+
+URL: `/api/v1/user/auth/signup`
+
+Body (raw JSON):
+
+```
+{
+  "mobile": "9876543211",
+
+  "name": "Name",
+
+  "email": "example@example.com",
+
+  "password": "securePassword123"
+}
+```
+
+2. Send OTP
+Request Name: Send-otp
+
+Method: POST
+
+URL: `/api/v1/user/auth/send-otp`
+
+Body (raw JSON):
+
+```
+{
+  "mobile": "9876543211"
+}
+```
+
+3. Verify OTP
+
+Request Name: verify-otp
+
+Method: POST
+
+URL: `/api/v1/user/auth/verify-otp`
+
+Body (raw JSON):
+
+```
+{
+  "otp": "987788"
+}
+```
+
+
+4. Change Password (Requires Bearer Token)
+
+Request Name: change-password
+
+Method: POST
+
+URL: `/api/v1/user/auth/change-password`
+
+Token Location: Authorization → Bearer Token
+
+
+
+5. Forgot Password
+
+Request Name: Forgot Password
+
+Method: POST
+
+URL: `/api/v1/user/auth/forgot-password`
+
+Body (raw JSON):
+
+```
+{
+  "mobile": "9876543221"
+}
+```
+
+6. Reset Password (After OTP)
+
+Request Name: Reset_Password
+
+Method: POST
+
+URL: `/api/v1/user/auth/reset-password`
+
+Body (raw JSON):
+```
+{
+  "otp": "123456",
+  "password": "securePassword123"
+}
+```
+
+7. Get User Info
+
+Request Name: User-info api
+
+Method: GET
+
+URL: `/api/v1/user/me`
+
+Auth: Bearer Token
+
+8. Create Chatroom
+
+Request Name: create chatroom
+
+Method: 
+
+URL: `/api/v1/chatroom/chatroom`
+
+Auth: Bearer Token
+
+9. Send Async Gemini Request
+
+Request Name: Request async gemini
+
+Method: POST
+
+URL: `/api/v1/chatroom/chatroom/{chatroom_id}`
+Replace {chatroom_id} with actual value
+
+Body (raw JSON):
+```
+{
+  "message": "What is a neutron star"
+}
+```
+
+10. Check Gemini Response Status
+
+Request Name: GET result
+
+Method: GET
+
+URL: `/api/v1/chatroom/chatroom/message-status/{message_id}`
+
+Replace {message_id} with task_id return by `/api/v1/chatroom/chatroom/{chatroom_id}`
+
+11. Get All Chatrooms
+
+Request Name: GET ALL
+
+Method: GET
+
+URL: `/api/v1/chatroom/chatroom`
+
+
+12. Get Chatroom by ID
+
+Request Name: get by chatroom_id
+
+Method: GET
+
+URL: `/api/v1/chatroom/chatroom/{chatroom_id}`
+
+
+13. Create Subscription Session
+
+Request Name: Create Session
+
+Method: POST
+
+URL: `/api/v1/subscription/subscribe/pro`
+
+returns a session of stripe payment interface
+
+
+14. Check Subscription Status
+
+Request Name: Subscriber Tier Status
+
+Method: GET
+
+URL: `/api/v1/subscription/subscription/status`
